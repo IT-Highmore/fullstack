@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4-oracle
+    container_name: mp-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "Root@123456"
+      MYSQL_DATABASE: "mp_demo"
+      TZ: "Asia/Shanghai"
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-sql:/docker-entrypoint-initdb.d
+    restart: always
+
+  redis:
+    image: redis:alpine
+    container_name: mp-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  mysql-data:
