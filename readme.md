@@ -1,0 +1,183 @@
+# Fullstack 全栈学习项目
+
+一个前后端分离的全栈学习项目,按「天」(day) 推进知识点,配套 Vue 3 + Element Plus 后台管理界面。后端是 Spring Boot 3 + MyBatis-Plus + Redis + JWT 的 REST API,前端是 Vue 3 + Vite + Element Plus。
+
+> 本项目由 `fullstack-learning-demo`(后端)与 `fullstack-learning-web`(前端)两个子项目组成。
+
+## 技术栈
+
+| 端 | 技术 | 版本 |
+| --- | --- | --- |
+| 后端 | Java / Spring Boot | 17 / 3.3.0 |
+| 后端 | MyBatis-Plus | 3.5.7 |
+| 后端 | Spring Security + JWT (jjwt) | 0.11.5 |
+| 后端 | MySQL / Redis | 8.4 / 最新 |
+| 前端 | Vue | 3.5 |
+| 前端 | Vue Router | 4.6 |
+| 前端 | Element Plus | 2.14 |
+| 前端 | Vite | 8.2 |
+| 前端 | Axios | 1.x |
+
+## 项目结构
+
+```
+fullstack
+├── fullstack-learning-demo/          # 后端 (Spring Boot)
+│   ├── docker-compose.yml            # MySQL + Redis 一键启动
+│   ├── pom.xml
+│   └── src/main/java/com/example/fullstacklearningdemo/
+│       ├── FullstackLearningDemoApplication.java   # 启动类
+│       ├── config/                   # CorsConfig / RedisConfig
+│       ├── day01/                    # IoC / DI 入门
+│       ├── day02/                    # 统一返回体 + 全局异常
+│       ├── day03/                    # MyBatis-Plus CRUD
+│       ├── day04/                    # Redis 缓存
+│       └── day07/                    # JWT + Spring Security
+│
+├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
+│   ├── index.html
+│   └── src/
+│       ├── api.js                    # axios 封装(请求/响应拦截器,自动带 Token)
+│       ├── router/index.js           # 路由表 + 登录守卫
+│       ├── layout/Layout.vue         # 后台布局(侧边菜单 + 顶栏)
+│       └── views/                    # Login / Dashboard / UserManagement
+│
+└── docs/                             # 逐日学习笔记(Day 1-8 + 7 天总结)
+```
+
+## 功能与学习路线
+
+| 模块 | 知识点 | 对应接口 |
+| --- | --- | --- |
+| Day 01 | Spring IoC / DI、`@RestController`、分层设计 | `/api/day01/*` |
+| Day 02 | `Result<T>` 统一响应、全局异常拦截、业务 code 规范 | `/api/day02/*` |
+| Day 03 | MyBatis-Plus ORM CRUD、`LambdaQueryWrapper` 条件查询 | `/api/day03/*` |
+| Day 04 | Redis 缓存(Cache-Aside 旁路缓存、TTL、主动清理) | `/api/day04/*` |
+| Day 05 | Vue 3 + Vite 工程搭建、Element Plus、Axios、CORS | — |
+| Day 06 | 前端 CRUD 表格(`el-table` / `el-dialog`)、自增主键 | — |
+| Day 07 | JWT + Spring Security 无状态认证、Axios 拦截器 | `/api/auth/*` |
+| Day 08 | Vue Router 4 多页路由、Layout 布局、路由守卫 | — |
+
+前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。
+
+## 学习笔记
+
+项目附带的逐日学习笔记存放在 [`docs/`](docs/) 目录,与代码一一对应:
+
+- **Day 1** — Spring Boot 3 核心思想:IoC 与 DI(`@RestController` vs `@Controller`)
+- **Day 2** — RESTful API 与统一响应封装(HTTP 状态码 vs 业务 code)
+- **Day 3** — MySQL 与 ORM 映射:MyBatis-Plus 实战(逻辑删除、连接池)
+- **Day 4** — Redis 缓存集成与分布式 key-value 设计(Cache-Aside 模式)
+- **Day 5** — Vue 3 + Vite 前端工程搭建(Element Plus、CORS)
+- **Day 6** — Vue 3 增删改查表格与状态管理(`el-table` / `el-dialog`)
+- **Day 7** — Spring Security + JWT 认证授权实战
+- **Day 8** — Vue Router 4 多页面路由与 Layout 布局搭建
+- **总结** — 7 天全栈学习总结(知识点速览表)
+
+## 快速开始
+
+### 环境要求
+
+- JDK 17+
+- Node.js 18+ 与 npm
+- Docker(用于一键启动 MySQL / Redis)
+- Maven(项目自带 `mvnw` wrapper,可省略本地安装)
+
+### 1. 启动数据库
+
+在 `fullstack-learning-demo/` 目录下:
+
+```bash
+docker compose up -d
+```
+
+会启动:
+- MySQL `mp-mysql` 映射到宿主机 `3307` 端口,初始库 `mp_demo`,密码 `Root@123456`
+- Redis `mp-redis` 映射到宿主机 `6379` 端口
+
+> 注意:docker-compose 声明了 `./init-sql` 目录用于自动初始化,但该目录目前为空/不存在,需手动建表(见下)。
+
+### 2. 初始化数据表
+
+连接 MySQL(`localhost:3307`,账号 `root` / `Root@123456`)执行:
+
+```sql
+CREATE DATABASE IF NOT EXISTS mp_demo DEFAULT CHARACTER SET utf8mb4;
+USE mp_demo;
+
+CREATE TABLE IF NOT EXISTS sys_user (
+    id    BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name  VARCHAR(50),
+    age   INT,
+    email VARCHAR(100)
+);
+```
+
+如需 docker 启动时自动初始化,可在 `fullstack-learning-demo/init-sql/` 下放入上面的 SQL 文件。
+
+### 3. 启动后端
+
+```bash
+cd fullstack-learning-demo
+./mvnw spring-boot:run     # Windows: mvnw.cmd spring-boot:run
+```
+
+启动后 API 地址:`http://localhost:8080/api`
+
+### 4. 启动前端
+
+```bash
+cd fullstack-learning-web
+npm install
+npm run dev
+```
+
+浏览器访问 `http://localhost:5173`。
+
+### 默认账号
+
+```
+用户名: admin
+密码:   123456
+```
+
+> 登录接口硬编码了该账号(见 `AuthController`),登录成功后返回 JWT,前端存入 `localStorage` 并在后续请求自动携带。
+
+## API 一览
+
+除登录接口外,**所有接口都需要在请求头携带** `Authorization: Bearer <token>`(由 `/api/auth/login` 返回)。所有响应统一为:
+
+```json
+{ "code": 200, "message": "操作成功", "data": { }, "timestamp": 1720000000000 }
+```
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/auth/login` | 登录,返回 token(admin / 123456) |
+| GET | `/api/day01/role?id=1` | Day01:按 id 返回角色字符串 |
+| GET | `/api/day02/user/{id}` | Day02:返回统一 Result 结构 |
+| GET | `/api/day02/test-error` | Day02:演示全局异常处理(主动抛异常) |
+| POST | `/api/day03/user` | Day03:新增用户 |
+| GET | `/api/day03/users?minAge=18` | Day03:按年龄条件查询 |
+| DELETE | `/api/day03/user/{id}` | Day03:删除用户 |
+| GET | `/api/day04/users?name=` | Day04:用户列表(按姓名模糊搜索) |
+| POST | `/api/day04/user` | Day04:新增或更新用户(更新时清理缓存) |
+| DELETE | `/api/day04/user/{id}` | Day04:删除用户(清理缓存) |
+| GET | `/api/day04/user/{id}` | Day04:用户详情(优先查 Redis 缓存,10 分钟过期) |
+
+> 前端「用户管理」页面实际调用的是 Day04 的一组接口。
+
+## 目录与包结构说明
+
+- **config/**:`CorsConfig` 全局跨域放行(开发期);`RedisConfig` 配置 RedisTemplate 的 JSON 序列化。
+- **day01/**:演示 IoC 容器与 `@Autowired` 依赖注入。
+- **day02/**:`Result<T>` 统一响应体 + `@RestControllerAdvice` 全局异常兜底。
+- **day03/**:`User` 实体映射 `sys_user` 表,`UserMapper extends BaseMapper` 免写 SQL;`LambdaQueryWrapper` 实现条件查询。
+- **day04/**:Cache-Aside 旁路缓存——查询「先查 Redis、未命中查 MySQL 再写回缓存(TTL 10 分钟)」,增删改时主动删除缓存保持一致性。
+- **day07/**:`JwtUtils` 签发/校验 token;`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。
+
+## 常见问题
+
+- **接口返回 401**:先调用 `/api/auth/login` 拿到 token,再在请求头携带 `Authorization: Bearer <token>`。
+- **后端启动失败连不上数据库**:确认 MySQL 已在 `3307` 端口运行且已建库建表。
+- **前端登录后接口报错**:后端需先启动,且 `api.js` 中 `baseURL` 指向 `http://localhost:8080/api`。
