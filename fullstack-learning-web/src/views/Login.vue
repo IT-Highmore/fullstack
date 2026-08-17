@@ -41,8 +41,8 @@ const handleLogin = async () => {
       ElMessage.success('登录成功！')
       localStorage.setItem('token', res.data.data.token)
       localStorage.setItem('username', res.data.data.username)
-      // 登录成功，跳转到系统主页
-      router.push('/users')
+      localStorage.setItem('permissions', JSON.stringify(res.data.data.permissions)) // 👈 保存权限标识列表
+      router.push('/dashboard')
     } else {
       ElMessage.error(res.data.msg || '登录失败')
     }

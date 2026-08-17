@@ -32,7 +32,7 @@ fullstack
 │       ├── day02/                    # 统一返回体 + 全局异常
 │       ├── day03/                    # MyBatis-Plus CRUD
 │       ├── day04/                    # Redis 缓存
-│       └── day07/                    # JWT + Spring Security
+│       └── day07/                    # JWT + Spring Security + RBAC 权限载荷
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
 │   ├── index.html
@@ -40,9 +40,10 @@ fullstack
 │       ├── api.js                    # axios 封装(请求/响应拦截器,自动带 Token)
 │       ├── router/index.js           # 路由表 + 登录守卫
 │       ├── layout/Layout.vue         # 后台布局(侧边菜单 + 顶栏)
+│       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
 │       └── views/                    # Login / Dashboard / UserManagement
 │
-└── docs/                             # 逐日学习笔记(Day 1-8 + 7 天总结)
+└── docs/                             # 逐日学习笔记(Day 1-9 + 7 天总结)
 ```
 
 ## 功能与学习路线
@@ -57,8 +58,9 @@ fullstack
 | Day 06 | 前端 CRUD 表格(`el-table` / `el-dialog`)、自增主键 | — |
 | Day 07 | JWT + Spring Security 无状态认证、Axios 拦截器 | `/api/auth/*` |
 | Day 08 | Vue Router 4 多页路由、Layout 布局、路由守卫 | — |
+| Day 09 | RBAC 权限模型、JWT 权限载荷、Vue 3 自定义指令 `v-permission` | `/api/auth/login` |
 
-前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。
+前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。
 
 ## 学习笔记
 
@@ -72,6 +74,7 @@ fullstack
 - **Day 6** — Vue 3 增删改查表格与状态管理(`el-table` / `el-dialog`)
 - **Day 7** — Spring Security + JWT 认证授权实战
 - **Day 8** — Vue Router 4 多页面路由与 Layout 布局搭建
+- **Day 9** — RBAC 权限模型与 Vue 3 自定义指令实战(`v-permission` 按钮级权限)
 - **总结** — 7 天全栈学习总结(知识点速览表)
 
 ## 快速开始
@@ -137,11 +140,11 @@ npm run dev
 ### 默认账号
 
 ```
-用户名: admin
-密码:   123456
+用户名: admin   密码: 123456   权限: user:list / user:add / user:edit / user:delete(全部)
+用户名: test    密码: 123456   权限: user:list(仅只读)
 ```
 
-> 登录接口硬编码了该账号(见 `AuthController`),登录成功后返回 JWT,前端存入 `localStorage` 并在后续请求自动携带。
+> 登录接口硬编码了这两个账号(见 `AuthController`),登录成功后返回 JWT **及权限列表** `permissions`,前端存入 `localStorage` 并在后续请求自动携带 Token、用 `v-permission` 指令控制按钮显隐。
 
 ## API 一览
 
@@ -153,7 +156,7 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/api/auth/login` | 登录,返回 token(admin / 123456) |
+| POST | `/api/auth/login` | 登录,返回 token + 权限列表(admin / test,密码均 123456) |
 | GET | `/api/day01/role?id=1` | Day01:按 id 返回角色字符串 |
 | GET | `/api/day02/user/{id}` | Day02:返回统一 Result 结构 |
 | GET | `/api/day02/test-error` | Day02:演示全局异常处理(主动抛异常) |
@@ -174,7 +177,7 @@ npm run dev
 - **day02/**:`Result<T>` 统一响应体 + `@RestControllerAdvice` 全局异常兜底。
 - **day03/**:`User` 实体映射 `sys_user` 表,`UserMapper extends BaseMapper` 免写 SQL;`LambdaQueryWrapper` 实现条件查询。
 - **day04/**:Cache-Aside 旁路缓存——查询「先查 Redis、未命中查 MySQL 再写回缓存(TTL 10 分钟)」,增删改时主动删除缓存保持一致性。
-- **day07/**:`JwtUtils` 签发/校验 token;`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。
+- **day07/**:`JwtUtils` 签发/校验 token(载荷中可携带 `permissions` 权限列表);`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。`AuthController` 按角色模拟分配权限:`admin` 全量 CRUD、`test` 只读。
 
 ## 常见问题
 

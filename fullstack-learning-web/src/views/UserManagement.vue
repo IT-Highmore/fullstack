@@ -3,7 +3,7 @@
     <template #header>
       <div class="card-header">
         <span>用户管理列表</span>
-        <el-button type="primary" icon="Plus" @click="handleCreate">新增用户</el-button>
+        <el-button v-permission="'user:add'" type="primary" icon="Plus" @click="handleCreate">新增用户</el-button>
       </div>
     </template>
 
@@ -22,10 +22,10 @@
       <el-table-column prop="email" label="邮箱" min-width="180" />
       <el-table-column label="操作" width="180" align="center">
         <template #default="scope">
-          <el-button size="small" type="warning" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button v-permission="'user:edit'" size="small" type="warning" @click="handleEdit(scope.row)">编辑</el-button>
           <el-popconfirm title="确定要删除该用户吗？" @confirm="handleDelete(scope.row.id)">
             <template #reference>
-              <el-button size="small" type="danger">删除</el-button>
+              <el-button v-permission="'user:delete'" size="small" type="danger">删除</el-button>
             </template>
           </el-popconfirm>
         </template>
