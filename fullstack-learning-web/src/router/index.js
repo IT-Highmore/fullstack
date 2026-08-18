@@ -25,6 +25,12 @@ const routes = [
         component: () => import("../views/UserManagement.vue"),
         meta: { title: "用户管理" },
       },
+      {
+        path: "file-upload",
+        name: "FileUpload",
+        component: () => import("../views/FileUpload.vue"),
+        meta: { title: "文件上传" },
+      },
     ],
   },
 ];

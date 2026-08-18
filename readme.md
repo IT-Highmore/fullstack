@@ -12,6 +12,7 @@
 | 后端 | MyBatis-Plus | 3.5.7 |
 | 后端 | Spring Security + JWT (jjwt) | 0.11.5 |
 | 后端 | MySQL / Redis | 8.4 / 最新 |
+| 后端 | MinIO (对象存储) | minio-8.5.7 |
 | 前端 | Vue | 3.5 |
 | 前端 | Vue Router | 4.6 |
 | 前端 | Element Plus | 2.14 |
@@ -32,7 +33,8 @@ fullstack
 │       ├── day02/                    # 统一返回体 + 全局异常
 │       ├── day03/                    # MyBatis-Plus CRUD
 │       ├── day04/                    # Redis 缓存
-│       └── day07/                    # JWT + Spring Security + RBAC 权限载荷
+│       ├── day07/                    # JWT + Spring Security + RBAC 权限载荷
+│       └── day10/                    # MinIO 分布式文件上传
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
 │   ├── index.html
@@ -41,7 +43,7 @@ fullstack
 │       ├── router/index.js           # 路由表 + 登录守卫
 │       ├── layout/Layout.vue         # 后台布局(侧边菜单 + 顶栏)
 │       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
-│       └── views/                    # Login / Dashboard / UserManagement
+│       └── views/                    # Login / Dashboard / UserManagement / FileUpload
 │
 └── docs/                             # 逐日学习笔记(Day 1-9 + 7 天总结)
 ```
@@ -59,8 +61,9 @@ fullstack
 | Day 07 | JWT + Spring Security 无状态认证、Axios 拦截器 | `/api/auth/*` |
 | Day 08 | Vue Router 4 多页路由、Layout 布局、路由守卫 | — |
 | Day 09 | RBAC 权限模型、JWT 权限载荷、Vue 3 自定义指令 `v-permission` | `/api/auth/login` |
+| Day 10 | MinIO 分布式对象存储、`el-upload` 图片上传 | `/api/file/upload` |
 
-前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。
+前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。
 
 ## 学习笔记
 
@@ -75,6 +78,7 @@ fullstack
 - **Day 7** — Spring Security + JWT 认证授权实战
 - **Day 8** — Vue Router 4 多页面路由与 Layout 布局搭建
 - **Day 9** — RBAC 权限模型与 Vue 3 自定义指令实战(`v-permission` 按钮级权限)
+- **Day 10** — MinIO 分布式文件上传实战(`MinioClient` 上传对象存储、`el-upload` 图片上传组件)
 - **总结** — 7 天全栈学习总结(知识点速览表)
 
 ## 快速开始
@@ -99,6 +103,16 @@ docker compose up -d
 - Redis `mp-redis` 映射到宿主机 `6379` 端口
 
 > 注意:docker-compose 声明了 `./init-sql` 目录用于自动初始化,但该目录目前为空/不存在,需手动建表(见下)。
+
+Day 10 的文件上传功能依赖 MinIO,`docker-compose.yml` 未包含该服务,需自行启动(默认账号密码均为 `minioadmin`,对应 `application.properties` 中的 `minio.*` 配置):
+
+```bash
+docker run -p 9000:9000 -p 9001:9001 --name minio \
+  -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" \
+  minio/minio server /data --console-address ":9001"
+```
+
+启动后访问 `http://localhost:9001` 进入控制台,手动创建 `application.properties` 中配置的 bucket(默认 `fullstack-bucket`)。
 
 ### 2. 初始化数据表
 
@@ -167,6 +181,7 @@ npm run dev
 | POST | `/api/day04/user` | Day04:新增或更新用户(更新时清理缓存) |
 | DELETE | `/api/day04/user/{id}` | Day04:删除用户(清理缓存) |
 | GET | `/api/day04/user/{id}` | Day04:用户详情(优先查 Redis 缓存,10 分钟过期) |
+| POST | `/api/file/upload` | Day10:上传文件到 MinIO,返回可访问的文件 URL |
 
 > 前端「用户管理」页面实际调用的是 Day04 的一组接口。
 
@@ -178,9 +193,11 @@ npm run dev
 - **day03/**:`User` 实体映射 `sys_user` 表,`UserMapper extends BaseMapper` 免写 SQL;`LambdaQueryWrapper` 实现条件查询。
 - **day04/**:Cache-Aside 旁路缓存——查询「先查 Redis、未命中查 MySQL 再写回缓存(TTL 10 分钟)」,增删改时主动删除缓存保持一致性。
 - **day07/**:`JwtUtils` 签发/校验 token(载荷中可携带 `permissions` 权限列表);`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。`AuthController` 按角色模拟分配权限:`admin` 全量 CRUD、`test` 只读。
+- **day10/**:`MinioConfig` 注入 `MinioClient` Bean;`FileUploadController` 接收 `MultipartFile`,以 UUID 生成对象名后上传至 MinIO 并返回可访问 URL。
 
 ## 常见问题
 
 - **接口返回 401**:先调用 `/api/auth/login` 拿到 token,再在请求头携带 `Authorization: Bearer <token>`。
 - **后端启动失败连不上数据库**:确认 MySQL 已在 `3307` 端口运行且已建库建表。
 - **前端登录后接口报错**:后端需先启动,且 `api.js` 中 `baseURL` 指向 `http://localhost:8080/api`。
+- **文件上传报错/超时**:确认 MinIO 已启动且 `fullstack-bucket` 已创建,`application.properties` 中 `minio.endpoint` 与实际地址一致。
