@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan("com.example.fullstacklearningdemo.day03")
+@MapperScan({"com.example.fullstacklearningdemo.day03", "com.example.fullstacklearningdemo.day11"})
 public class FullstackLearningDemoApplication {
 
     public static void main(String[] args) {

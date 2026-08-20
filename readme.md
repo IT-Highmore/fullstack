@@ -34,7 +34,8 @@ fullstack
 │       ├── day03/                    # MyBatis-Plus CRUD
 │       ├── day04/                    # Redis 缓存
 │       ├── day07/                    # JWT + Spring Security + RBAC 权限载荷
-│       └── day10/                    # MinIO 分布式文件上传
+│       ├── day10/                    # MinIO 分布式文件上传
+│       └── day11/                    # MyBatis-Plus 分页插件 + 多表查询
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
 │   ├── index.html
@@ -45,7 +46,7 @@ fullstack
 │       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
 │       └── views/                    # Login / Dashboard / UserManagement / FileUpload
 │
-└── docs/                             # 逐日学习笔记(Day 1-9 + 7 天总结)
+└── docs/                             # 逐日学习笔记(Day 1-11 + 7 天总结)
 ```
 
 ## 功能与学习路线
@@ -62,8 +63,9 @@ fullstack
 | Day 08 | Vue Router 4 多页路由、Layout 布局、路由守卫 | — |
 | Day 09 | RBAC 权限模型、JWT 权限载荷、Vue 3 自定义指令 `v-permission` | `/api/auth/login` |
 | Day 10 | MinIO 分布式对象存储、`el-upload` 图片上传 | `/api/file/upload` |
+| Day 11 | MyBatis-Plus 分页插件、`UserVO` 多表关联查询 | `/api/day11/users/page` |
 
-前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。
+前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。Day 11 用户管理列表改为真后端分页,搭配 `<el-pagination>` 分页组件,并按名称搜索、以 Tag 展示关联的角色名称。
 
 ## 学习笔记
 
@@ -79,6 +81,7 @@ fullstack
 - **Day 8** — Vue Router 4 多页面路由与 Layout 布局搭建
 - **Day 9** — RBAC 权限模型与 Vue 3 自定义指令实战(`v-permission` 按钮级权限)
 - **Day 10** — MinIO 分布式文件上传实战(`MinioClient` 上传对象存储、`el-upload` 图片上传组件)
+- **Day 11** — MyBatis-Plus 分页插件与复杂多表查询(`MybatisPlusInterceptor` 分页拦截器、`UserVO` 多表 Join 查询、`<el-pagination>` 组件)
 - **总结** — 7 天全栈学习总结(知识点速览表)
 
 ## 快速开始
@@ -182,6 +185,7 @@ npm run dev
 | DELETE | `/api/day04/user/{id}` | Day04:删除用户(清理缓存) |
 | GET | `/api/day04/user/{id}` | Day04:用户详情(优先查 Redis 缓存,10 分钟过期) |
 | POST | `/api/file/upload` | Day10:上传文件到 MinIO,返回可访问的文件 URL |
+| GET | `/api/day11/users/page?page=1&size=5&name=` | Day11:分页查询用户列表(含角色名称,支持按姓名模糊搜索) |
 
 > 前端「用户管理」页面实际调用的是 Day04 的一组接口。
 
@@ -194,6 +198,7 @@ npm run dev
 - **day04/**:Cache-Aside 旁路缓存——查询「先查 Redis、未命中查 MySQL 再写回缓存(TTL 10 分钟)」,增删改时主动删除缓存保持一致性。
 - **day07/**:`JwtUtils` 签发/校验 token(载荷中可携带 `permissions` 权限列表);`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。`AuthController` 按角色模拟分配权限:`admin` 全量 CRUD、`test` 只读。
 - **day10/**:`MinioConfig` 注入 `MinioClient` Bean;`FileUploadController` 接收 `MultipartFile`,以 UUID 生成对象名后上传至 MinIO 并返回可访问 URL。
+- **day11/**:`MybatisPlusConfig` 注册 MySQL 分页拦截器;`UserPageMapper` 通过 `@Select` 自定义多表 SQL 返回 `UserVO`;`UserPageController` 接收 `page`/`size`/`name` 参数返回分页结果(IPage)。
 
 ## 常见问题
 
