@@ -13,6 +13,7 @@
 | 后端 | Spring Security + JWT (jjwt) | 0.11.5 |
 | 后端 | MySQL / Redis | 8.4 / 最新 |
 | 后端 | MinIO (对象存储) | minio-8.5.7 |
+| 后端 | RabbitMQ (AMQP) | 3-management |
 | 前端 | Vue | 3.5 |
 | 前端 | Vue Router | 4.6 |
 | 前端 | Element Plus | 2.14 |
@@ -36,7 +37,8 @@ fullstack
 │       ├── day07/                    # JWT + Spring Security + RBAC 权限载荷
 │       ├── day10/                    # MinIO 分布式文件上传
 │       ├── day11/                    # MyBatis-Plus 分页插件 + 多表查询
-│       └── day12/                    # Spring AOP 业务操作日志 + 异步记录
+│       ├── day12/                    # Spring AOP 业务操作日志
+│       └── day13/                    # RabbitMQ 异步消息队列(日志投递与消费)
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
 │   ├── index.html
@@ -47,7 +49,7 @@ fullstack
 │       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
 │       └── views/                    # Login / Dashboard / UserManagement / FileUpload
 │
-└── docs/                             # 逐日学习笔记(Day 1-12 + 7 天总结)
+└── docs/                             # 逐日学习笔记(Day 1-13 + 7 天总结)
 ```
 
 ## 功能与学习路线
@@ -65,7 +67,8 @@ fullstack
 | Day 09 | RBAC 权限模型、JWT 权限载荷、Vue 3 自定义指令 `v-permission` | `/api/auth/login` |
 | Day 10 | MinIO 分布式对象存储、`el-upload` 图片上传 | `/api/file/upload` |
 | Day 11 | MyBatis-Plus 分页插件、`UserVO` 多表关联查询 | `/api/day11/users/page` |
-| Day 12 | Spring AOP 自定义 `@Log` 注解、切面统一记录操作日志、`@Async` 异步落盘 | `/api/day11/users/page`(已挂 `@Log`) |
+| Day 12 | Spring AOP 自定义 `@Log` 注解、切面统一记录操作日志 | `/api/day11/users/page`(已挂 `@Log`) |
+| Day 13 | RabbitMQ 消息队列：Direct 交换机/队列/绑定、生产者投递、`@RabbitListener` 异步消费 | `/api/day11/users/page`(日志经 MQ 投递) |
 
 前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。Day 11 用户管理列表改为真后端分页,搭配 `<el-pagination>` 分页组件,并按名称搜索、以 Tag 展示关联的角色名称。
 
@@ -84,7 +87,8 @@ fullstack
 - **Day 9** — RBAC 权限模型与 Vue 3 自定义指令实战(`v-permission` 按钮级权限)
 - **Day 10** — MinIO 分布式文件上传实战(`MinioClient` 上传对象存储、`el-upload` 图片上传组件)
 - **Day 11** — MyBatis-Plus 分页插件与复杂多表查询(`MybatisPlusInterceptor` 分页拦截器、`UserVO` 多表 Join 查询、`<el-pagination>` 组件)
-- **Day 12** — Spring Boot AOP 业务操作日志与异步记录(自定义 `@Log` 注解、`@Aspect` 环绕通知、`@Async` 线程池异步落盘)
+- **Day 12** — Spring Boot AOP 业务操作日志(自定义 `@Log` 注解、`@Aspect` 环绕通知)
+- **Day 13** — RabbitMQ 异步消息队列与削峰填谷(`RabbitTemplate` 生产者投递、`@RabbitListener` 消费者监听、Direct 交换机/队列/绑定)
 - **总结** — 7 天全栈学习总结(知识点速览表)
 
 ## 快速开始
@@ -119,6 +123,18 @@ docker run -p 9000:9000 -p 9001:9001 --name minio \
 ```
 
 启动后访问 `http://localhost:9001` 进入控制台,手动创建 `application.properties` 中配置的 bucket(默认 `fullstack-bucket`)。
+
+Day 13 的操作日志队列依赖 RabbitMQ,同样需要自行启动(5672 为 AMQP 通信端口、15672 为 Web 管理界面):
+
+```bash
+docker run -d \
+  --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:3-management
+```
+
+启动后访问 `http://localhost:15672`(账号/密码默认 `guest`),后端首次启动时会自动声明交换机 `system.log.exchange` 与队列 `system.log.queue`。
 
 ### 2. 初始化数据表
 
@@ -188,7 +204,7 @@ npm run dev
 | DELETE | `/api/day04/user/{id}` | Day04:删除用户(清理缓存) |
 | GET | `/api/day04/user/{id}` | Day04:用户详情(优先查 Redis 缓存,10 分钟过期) |
 | POST | `/api/file/upload` | Day10:上传文件到 MinIO,返回可访问的文件 URL |
-| GET | `/api/day11/users/page?page=1&size=5&name=` | Day11:分页查询用户列表(含角色名称,支持按姓名模糊搜索;Day12 起挂 `@Log` 自动记录操作日志) |
+| GET | `/api/day11/users/page?page=1&size=5&name=` | Day11:分页查询用户列表(含角色名称,支持按姓名模糊搜索;Day12 起挂 `@Log`,Day13 起日志经 RabbitMQ 解耦投递消费) |
 
 > 前端「用户管理」页面实际调用的是 Day04 的一组接口。
 
@@ -202,7 +218,8 @@ npm run dev
 - **day07/**:`JwtUtils` 签发/校验 token(载荷中可携带 `permissions` 权限列表);`JwtAuthenticationFilter` 解析请求头;`SecurityConfig` 放行登录接口、其余接口全部鉴权。`AuthController` 按角色模拟分配权限:`admin` 全量 CRUD、`test` 只读。
 - **day10/**:`MinioConfig` 注入 `MinioClient` Bean;`FileUploadController` 接收 `MultipartFile`,以 UUID 生成对象名后上传至 MinIO 并返回可访问 URL。
 - **day11/**:`MybatisPlusConfig` 注册 MySQL 分页拦截器;`UserPageMapper` 通过 `@Select` 自定义多表 SQL 返回 `UserVO`;`UserPageController` 接收 `page`/`size`/`name` 参数返回分页结果(IPage)。
-- **day12/**:`Log` 自定义注解标记需记录日志的方法;`LogAspect` 环绕切面拦截 `@Log` 方法,采集请求 URL/IP/参数/耗时/当前登录人后封装为 `SysLog`;`AsyncConfig` 配置 `logExecutor` 线程池并开启 `@EnableAsync`;`LogService` 通过 `@Async("logExecutor")` 异步落盘,不阻塞主业务线程。
+- **day12/**:`Log` 自定义注解标记需记录日志的方法;`LogAspect` 环绕切面拦截 `@Log` 方法,采集请求 URL/IP/参数/耗时/当前登录人后封装为 `SysLog`;`LogService` 作为生产者将日志序列化为 JSON 投递到 RabbitMQ,不再走单机线程池。
+- **day13/**:`RabbitConfig` 声明 Direct 交换机 `system.log.exchange`、持久化队列 `system.log.queue` 及其绑定;`LogMessageConsumer` 通过 `@RabbitListener` 监听队列,反序列化后异步消费日志,实现业务解耦与削峰填谷。
 
 ## 常见问题
 
@@ -210,3 +227,4 @@ npm run dev
 - **后端启动失败连不上数据库**:确认 MySQL 已在 `3307` 端口运行且已建库建表。
 - **前端登录后接口报错**:后端需先启动,且 `api.js` 中 `baseURL` 指向 `http://localhost:8080/api`。
 - **文件上传报错/超时**:确认 MinIO 已启动且 `fullstack-bucket` 已创建,`application.properties` 中 `minio.endpoint` 与实际地址一致。
+- **操作页面后控制台无日志输出**:确认 RabbitMQ 容器已启动(`http://localhost:15672` 可登录),后端启动日志中已声明 `system.log.exchange` / `system.log.queue`;投递失败时 `LogService` 会打印异常堆栈。
