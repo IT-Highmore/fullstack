@@ -7,7 +7,7 @@ services:
     container_name: fullstack-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: fullstack_db
+      MYSQL_DATABASE: mp_demo
     ports:
       - "3306:3306"
     volumes:

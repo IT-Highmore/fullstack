@@ -125,7 +125,7 @@ docker compose up -d --build
 
 | 服务 | 容器名 | 端口 | 说明 |
 | --- | --- | --- | --- |
-| mysql | `fullstack-mysql` | 3306 | root / `root`,初始库 `fullstack_db`(后端实际使用 `mp_demo`,需手动建库建表,见下文) |
+| mysql | `fullstack-mysql` | 3306 | root / `root`,初始库 `mp_demo`(首次启动自动创建,表仍需手动建,见下文) |
 | redis | `fullstack-redis` | 6379 | — |
 | minio | `fullstack-minio` | 9000 / 9001 | `minioadmin` / `minioadmin`,9001 为控制台 |
 | minio-init | — | — | 一次性任务:创建 `fullstack-bucket` 并开放匿名读 |
