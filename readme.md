@@ -14,6 +14,8 @@
 | 后端 | MySQL / Redis | 8.4 / 最新 |
 | 后端 | MinIO (对象存储) | minio-8.5.7 |
 | 后端 | RabbitMQ (AMQP) | 3-management |
+| 部署 | Docker Compose | 一键编排 6 个服务 |
+| 部署 | Nginx (前端静态托管 + `/api` 反向代理) | alpine |
 | 前端 | Vue | 3.5 |
 | 前端 | Vue Router | 4.6 |
 | 前端 | Element Plus | 2.14 |
@@ -24,8 +26,10 @@
 
 ```
 fullstack
+├── docker-compose.yml                # 全栈一键编排(MySQL/Redis/MinIO/RabbitMQ/后端/前端)
 ├── fullstack-learning-demo/          # 后端 (Spring Boot)
-│   ├── docker-compose.yml            # MySQL + Redis 一键启动
+│   ├── Dockerfile                    # 后端镜像(eclipse-temurin:17-jre,复制 target/*.jar)
+│   ├── docker-compose.yml            # 仅 MySQL + Redis(本地开发用)
 │   ├── pom.xml
 │   └── src/main/java/com/example/fullstacklearningdemo/
 │       ├── FullstackLearningDemoApplication.java   # 启动类
@@ -41,6 +45,8 @@ fullstack
 │       └── day13/                    # RabbitMQ 异步消息队列(日志投递与消费)
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
+│   ├── Dockerfile                    # 前端镜像(nginx:alpine,复制 dist/)
+│   ├── nginx.conf                    # history 模式回退 + /api 反向代理到 backend:8080
 │   ├── index.html
 │   └── src/
 │       ├── api.js                    # axios 封装(请求/响应拦截器,自动带 Token)
@@ -49,7 +55,7 @@ fullstack
 │       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
 │       └── views/                    # Login / Dashboard / UserManagement / FileUpload
 │
-└── docs/                             # 逐日学习笔记(Day 1-13 + 7 天总结)
+└── docs/                             # 逐日学习笔记(Day 1-14 + 7 天总结)
 ```
 
 ## 功能与学习路线
@@ -69,6 +75,7 @@ fullstack
 | Day 11 | MyBatis-Plus 分页插件、`UserVO` 多表关联查询 | `/api/day11/users/page` |
 | Day 12 | Spring AOP 自定义 `@Log` 注解、切面统一记录操作日志 | `/api/day11/users/page`(已挂 `@Log`) |
 | Day 13 | RabbitMQ 消息队列：Direct 交换机/队列/绑定、生产者投递、`@RabbitListener` 异步消费 | `/api/day11/users/page`(日志经 MQ 投递) |
+| Day 14 | 前端 `npm run build` 打包、Nginx 托管与反向代理、后端 Jar + Dockerfile、Docker Compose 全栈一键编排 | `http://localhost`(Nginx 80 端口) |
 
 前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。Day 11 用户管理列表改为真后端分页,搭配 `<el-pagination>` 分页组件,并按名称搜索、以 Tag 展示关联的角色名称。
 
@@ -89,6 +96,7 @@ fullstack
 - **Day 11** — MyBatis-Plus 分页插件与复杂多表查询(`MybatisPlusInterceptor` 分页拦截器、`UserVO` 多表 Join 查询、`<el-pagination>` 组件)
 - **Day 12** — Spring Boot AOP 业务操作日志(自定义 `@Log` 注解、`@Aspect` 环绕通知)
 - **Day 13** — RabbitMQ 异步消息队列与削峰填谷(`RabbitTemplate` 生产者投递、`@RabbitListener` 消费者监听、Direct 交换机/队列/绑定)
+- **Day 14** — 全栈项目打包、Docker 容器化与生产环境部署(Nginx 配置、前后端 Dockerfile、Docker Compose 编排)
 - **总结** — 7 天全栈学习总结(知识点速览表)
 
 ## 快速开始
@@ -100,45 +108,54 @@ fullstack
 - Docker(用于一键启动 MySQL / Redis)
 - Maven(项目自带 `mvnw` wrapper,可省略本地安装)
 
-### 1. 启动数据库
+### 方式一:Docker Compose 一键部署(Day 14)
 
-在 `fullstack-learning-demo/` 目录下:
-
-```bash
-docker compose up -d
-```
-
-会启动:
-- MySQL `mp-mysql` 映射到宿主机 `3307` 端口,初始库 `mp_demo`,密码 `Root@123456`
-- Redis `mp-redis` 映射到宿主机 `6379` 端口
-
-> 注意:docker-compose 声明了 `./init-sql` 目录用于自动初始化,但该目录目前为空/不存在,需手动建表(见下)。
-
-Day 10 的文件上传功能依赖 MinIO,`docker-compose.yml` 未包含该服务,需自行启动(默认账号密码均为 `minioadmin`,对应 `application.properties` 中的 `minio.*` 配置):
+在项目根目录先打包前后端(两个 Dockerfile 只复制构建产物,不在镜像内编译):
 
 ```bash
-docker run -p 9000:9000 -p 9001:9001 --name minio \
-  -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" \
-  minio/minio server /data --console-address ":9001"
+cd fullstack-learning-demo && ./mvnw clean package -DskipTests && cd ..
+cd fullstack-learning-web && npm install && npm run build && cd ..
 ```
 
-启动后访问 `http://localhost:9001` 进入控制台,手动创建 `application.properties` 中配置的 bucket(默认 `fullstack-bucket`)。
-
-Day 13 的操作日志队列依赖 RabbitMQ,同样需要自行启动(5672 为 AMQP 通信端口、15672 为 Web 管理界面):
+再启动全部服务:
 
 ```bash
-docker run -d \
-  --name rabbitmq \
-  -p 5672:5672 \
-  -p 15672:15672 \
-  rabbitmq:3-management
+docker compose up -d --build
 ```
 
-启动后访问 `http://localhost:15672`(账号/密码默认 `guest`),后端首次启动时会自动声明交换机 `system.log.exchange` 与队列 `system.log.queue`。
+| 服务 | 容器名 | 端口 | 说明 |
+| --- | --- | --- | --- |
+| mysql | `fullstack-mysql` | 3306 | root / `root`,初始库 `fullstack_db`(后端实际使用 `mp_demo`,需手动建库建表,见下文) |
+| redis | `fullstack-redis` | 6379 | — |
+| minio | `fullstack-minio` | 9000 / 9001 | `minioadmin` / `minioadmin`,9001 为控制台 |
+| minio-init | — | — | 一次性任务:创建 `fullstack-bucket` 并开放匿名读 |
+| rabbitmq | `fullstack-rabbitmq` | 5672 / 15672 | `guest` / `guest` |
+| backend | `fullstack-backend` | 8080 | 通过环境变量把数据库、Redis、RabbitMQ、MinIO 地址指向容器服务名 |
+| frontend | `fullstack-frontend` | 80 | Nginx 托管前端,`/api/` 反向代理到 `backend:8080` |
 
-### 2. 初始化数据表
+启动后访问 `http://localhost` 即可。上传文件返回的 URL 由 `minio.public-endpoint`(compose 中为 `http://localhost:9000`)决定,未配置时退回 `minio.endpoint`,避免返回浏览器无法解析的容器内地址。
 
-连接 MySQL(`localhost:3307`,账号 `root` / `Root@123456`)执行:
+> 注意:`depends_on` 只保证启动顺序,不等待 MySQL 就绪。若 backend 首次启动连不上数据库,待 MySQL 初始化完成后执行 `docker compose restart backend`。
+
+### 方式二:本地开发
+
+#### 1. 启动依赖服务
+
+只启动中间件,后端和前端在本机运行:
+
+```bash
+docker compose up -d mysql redis minio minio-init rabbitmq
+```
+
+服务端口与账号见上表。本地后端 `application.properties` 默认连接 `localhost:3306`,账号 `root`,密码 `root`,与根目录 compose 中的 MySQL 一致。
+
+> `fullstack-learning-demo/docker-compose.yml` 是早期只含 MySQL + Redis 的版本(MySQL 映射 `3307`、密码 `Root@123456`),如果用它启动数据库,需要同步修改 `application.properties` 中的连接地址和密码。
+
+启动后可访问 MinIO 控制台 `http://localhost:9001` 与 RabbitMQ 管理界面 `http://localhost:15672`。后端首次启动时会自动声明交换机 `system.log.exchange` 与队列 `system.log.queue`。
+
+#### 2. 初始化数据表
+
+连接 MySQL(`localhost:3306`,账号 `root` / `root`)执行:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS mp_demo DEFAULT CHARACTER SET utf8mb4;
@@ -152,9 +169,9 @@ CREATE TABLE IF NOT EXISTS sys_user (
 );
 ```
 
-如需 docker 启动时自动初始化,可在 `fullstack-learning-demo/init-sql/` 下放入上面的 SQL 文件。
+Docker Compose 部署时,同样需要先进入 MySQL 容器(`docker exec -it fullstack-mysql mysql -uroot -proot`)执行上面的 SQL,再重启 backend。
 
-### 3. 启动后端
+#### 3. 启动后端
 
 ```bash
 cd fullstack-learning-demo
@@ -163,7 +180,7 @@ cd fullstack-learning-demo
 
 启动后 API 地址:`http://localhost:8080/api`
 
-### 4. 启动前端
+#### 4. 启动前端
 
 ```bash
 cd fullstack-learning-web
@@ -172,6 +189,8 @@ npm run dev
 ```
 
 浏览器访问 `http://localhost:5173`。
+
+> 前端 `api.js` 的 `baseURL` 为 `http://localhost:8080/api`,Compose 部署时由宿主机映射的 8080 端口转发到后端容器。
 
 ### 默认账号
 
@@ -224,7 +243,8 @@ npm run dev
 ## 常见问题
 
 - **接口返回 401**:先调用 `/api/auth/login` 拿到 token,再在请求头携带 `Authorization: Bearer <token>`。
-- **后端启动失败连不上数据库**:确认 MySQL 已在 `3307` 端口运行且已建库建表。
+- **后端启动失败连不上数据库**:确认 MySQL 已在 `3306` 端口运行且已建库 `mp_demo` 建表(Compose 部署时 backend 先于 MySQL 就绪会连接失败,执行 `docker compose restart backend`)。
 - **前端登录后接口报错**:后端需先启动,且 `api.js` 中 `baseURL` 指向 `http://localhost:8080/api`。
-- **文件上传报错/超时**:确认 MinIO 已启动且 `fullstack-bucket` 已创建,`application.properties` 中 `minio.endpoint` 与实际地址一致。
+- **文件上传报错/超时**:确认 MinIO 已启动且 `fullstack-bucket` 已创建(Compose 的 `minio-init` 会自动创建),`application.properties` 中 `minio.endpoint` 与实际地址一致。
+- **上传后图片打不开**:检查 `minio.public-endpoint` 是否为浏览器可访问的地址(Compose 中为 `http://localhost:9000`),且 bucket 已开放匿名读。
 - **操作页面后控制台无日志输出**:确认 RabbitMQ 容器已启动(`http://localhost:15672` 可登录),后端启动日志中已声明 `system.log.exchange` / `system.log.queue`;投递失败时 `LogService` 会打印异常堆栈。
