@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # 1. MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: fullstack-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: fullstack_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # 2. Redis 缓存
+  redis:
+    image: redis:alpine
+    container_name: fullstack-redis
+    ports:
+      - "6379:6379"
+
+  # 3. MinIO 对象存储
+  minio:
+    image: minio/minio
+    container_name: fullstack-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+
+  # 3.1 一次性任务：创建 bucket 并开放匿名读（上传后返回的 URL 才能直接访问）
+  minio-init:
+    image: minio/minio
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint: >
+      sh -c "until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/fullstack-bucket;
+      mc anonymous set download local/fullstack-bucket"
+
+  # 4. RabbitMQ 消息队列
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fullstack-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  # 5. Spring Boot 后端服务
+  backend:
+    build:
+      context: ./fullstack-learning-demo
+      dockerfile: Dockerfile
+    container_name: fullstack-backend
+    ports:
+      - "8080:8080"
+    # 容器内 localhost 指向自身，用服务名覆盖 application.properties 里的连接地址
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/mp_demo?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000 # 返回给浏览器的文件访问地址
+    depends_on:
+      - mysql
+      - redis
+      - minio
+      - rabbitmq
+
+  # 6. Vue 3 + Nginx 前端服务
+  frontend:
+    build:
+      context: ./fullstack-learning-web
+      dockerfile: Dockerfile
+    container_name: fullstack-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:

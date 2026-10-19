@@ -21,7 +21,8 @@ public class FileUploadController {
   @Value("${minio.bucketName}")
   private String bucketName;
 
-  @Value("${minio.endpoint}")
+  // 返回给浏览器的访问地址，未配置时退回内部 endpoint
+  @Value("${minio.public-endpoint:${minio.endpoint}}")
   private String endpoint;
 
   @PostMapping("/upload")
