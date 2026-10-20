@@ -14,7 +14,9 @@
 | 后端 | MySQL / Redis | 8.4 / 最新 |
 | 后端 | MinIO (对象存储) | minio-8.5.7 |
 | 后端 | RabbitMQ (AMQP) | 3-management |
+| 后端 | Spring Cloud / Spring Cloud Alibaba (Nacos 注册发现 + 配置中心) | 2023.0.3 / 2023.0.1.0 |
 | 部署 | Docker Compose | 一键编排 6 个服务 |
+| 部署 | Kubernetes (Deployment + NodePort Service) | — |
 | 部署 | Nginx (前端静态托管 + `/api` 反向代理) | alpine |
 | 前端 | Vue | 3.5 |
 | 前端 | Vue Router | 4.6 |
@@ -31,6 +33,11 @@ fullstack
 │   ├── Dockerfile                    # 后端镜像(eclipse-temurin:17-jre,复制 target/*.jar)
 │   ├── docker-compose.yml            # 仅 MySQL + Redis(本地开发用)
 │   ├── pom.xml
+│   ├── k8s/
+│   │   └── backend-deployment.yaml   # K8s Deployment(2 副本 + 探针)+ NodePort Service(30080)
+│   ├── src/main/resources/
+│   │   ├── application.properties
+│   │   └── bootstrap.properties      # Nacos 注册中心 / 配置中心地址(优先加载)
 │   └── src/main/java/com/example/fullstacklearningdemo/
 │       ├── FullstackLearningDemoApplication.java   # 启动类
 │       ├── config/                   # CorsConfig / RedisConfig
@@ -42,7 +49,8 @@ fullstack
 │       ├── day10/                    # MinIO 分布式文件上传
 │       ├── day11/                    # MyBatis-Plus 分页插件 + 多表查询
 │       ├── day12/                    # Spring AOP 业务操作日志
-│       └── day13/                    # RabbitMQ 异步消息队列(日志投递与消费)
+│       ├── day13/                    # RabbitMQ 异步消息队列(日志投递与消费)
+│       └── day15/                    # Nacos 动态配置(@RefreshScope)
 │
 ├── fullstack-learning-web/           # 前端 (Vue 3 + Vite)
 │   ├── Dockerfile                    # 前端镜像(nginx:alpine,复制 dist/)
@@ -55,7 +63,7 @@ fullstack
 │       ├── directives/permission.js  # v-permission 自定义指令(按钮级权限)
 │       └── views/                    # Login / Dashboard / UserManagement / FileUpload
 │
-└── docs/                             # 逐日学习笔记(Day 1-14 + 7 天总结)
+└── docs/                             # 逐日学习笔记(Day 1-15 + 阶段总结)
 ```
 
 ## 功能与学习路线
@@ -76,6 +84,7 @@ fullstack
 | Day 12 | Spring AOP 自定义 `@Log` 注解、切面统一记录操作日志 | `/api/day11/users/page`(已挂 `@Log`) |
 | Day 13 | RabbitMQ 消息队列：Direct 交换机/队列/绑定、生产者投递、`@RabbitListener` 异步消费 | `/api/day11/users/page`(日志经 MQ 投递) |
 | Day 14 | 前端 `npm run build` 打包、Nginx 托管与反向代理、后端 Jar + Dockerfile、Docker Compose 全栈一键编排 | `http://localhost`(Nginx 80 端口) |
+| Day 15 | Nacos 服务注册与发现、Nacos Config 动态配置 + `@RefreshScope` 热刷新、K8s `Deployment` / `Service` 部署清单 | `/api/day15/config` |
 
 前端已实现一套完整的后台管理界面:登录页 → 侧边栏 Layout 布局 → 控制台首页 / 用户管理(列表搜索、新增、编辑、删除)。通过 Vue Router 路由守卫控制访问权限,axios 拦截器自动携带 Token 并在 401 时清理登录态。Day 09 起引入 RBAC 按钮级权限:登录返回权限列表存入 `localStorage`,页面按钮通过 `v-permission` 指令按权限标识控制显隐。Day 10 新增「文件上传」页面,基于 `el-upload` 上传图片到 MinIO,成功后回显线上访问地址。Day 11 用户管理列表改为真后端分页,搭配 `<el-pagination>` 分页组件,并按名称搜索、以 Tag 展示关联的角色名称。
 
@@ -97,7 +106,8 @@ fullstack
 - **Day 12** — Spring Boot AOP 业务操作日志(自定义 `@Log` 注解、`@Aspect` 环绕通知)
 - **Day 13** — RabbitMQ 异步消息队列与削峰填谷(`RabbitTemplate` 生产者投递、`@RabbitListener` 消费者监听、Direct 交换机/队列/绑定)
 - **Day 14** — 全栈项目打包、Docker 容器化与生产环境部署(Nginx 配置、前后端 Dockerfile、Docker Compose 编排)
-- **总结** — 7 天全栈学习总结(知识点速览表)
+- **Day 15** — 微服务云原生演进:Nacos 服务治理(注册发现 + 动态配置、`@RefreshScope`)与 Kubernetes 部署实战(Mac ARM64 适配、阿里云 Maven 镜像)
+- **总结** — 7 天 / 14 天全栈学习总结(知识点速览表)
 
 ## 快速开始
 
@@ -192,6 +202,43 @@ npm run dev
 
 > 前端 `api.js` 的 `baseURL` 为 `http://localhost:8080/api`,Compose 部署时由宿主机映射的 8080 端口转发到后端容器。
 
+### Nacos 与 K8s(Day 15)
+
+后端依赖 Nacos(`bootstrap.properties` 指向 `127.0.0.1:8848`),本地运行后端前需先启动 Nacos。官方镜像缺少 arm64 清单,Mac(Apple Silicon)用 amd64 平台启动:
+
+```bash
+docker run -d --name nacos-standalone --platform linux/amd64 \
+  -e MODE=standalone -p 8848:8848 -p 9848:9848 \
+  nacos/nacos-server:v2.2.3
+```
+
+控制台 `http://localhost:8848/nacos`(账号/密码 `nacos` / `nacos`)。在「配置管理 → 配置列表」新建配置:
+
+- Data ID:`fullstack-backend.yaml`,Group:`DEFAULT_GROUP`,格式:`YAML`
+- 内容示例:
+
+```yaml
+app:
+  info: "欢迎使用 Nacos 动态配置中心"
+```
+
+启动后端后:
+
+- 「服务管理 → 服务列表」中应出现 `fullstack-backend`
+- 访问 `http://localhost:8080/api/day15/config` 读取配置;在控制台修改并发布后无需重启,刷新接口即可看到新值(`@RefreshScope`)
+
+K8s 部署清单位于 `fullstack-learning-demo/k8s/backend-deployment.yaml`,先构建镜像再应用:
+
+```bash
+cd fullstack-learning-demo && ./mvnw clean package -DskipTests
+docker build -t fullstack-backend:latest .
+kubectl apply -f k8s/backend-deployment.yaml
+```
+
+Service 为 NodePort,对外端口 `30080`。
+
+> 注意:Pod 内的 `127.0.0.1:8848` 指向容器自身,连不上宿主机上的 Nacos;K8s 部署时需把 `bootstrap.properties` 中的 Nacos 地址改为集群内可达的地址(例如宿主机 IP 或集群内 Nacos Service)。清单中的存活/就绪探针也探测 `/api/day15/config`,依赖该接口可用。
+
 ### 默认账号
 
 ```
@@ -224,6 +271,7 @@ npm run dev
 | GET | `/api/day04/user/{id}` | Day04:用户详情(优先查 Redis 缓存,10 分钟过期) |
 | POST | `/api/file/upload` | Day10:上传文件到 MinIO,返回可访问的文件 URL |
 | GET | `/api/day11/users/page?page=1&size=5&name=` | Day11:分页查询用户列表(含角色名称,支持按姓名模糊搜索;Day12 起挂 `@Log`,Day13 起日志经 RabbitMQ 解耦投递消费) |
+| GET | `/api/day15/config` | Day15:读取 Nacos 动态配置 `app.info`(已在 `SecurityConfig` 放行,无需 Token) |
 
 > 前端「用户管理」页面实际调用的是 Day04 的一组接口。
 
@@ -239,6 +287,7 @@ npm run dev
 - **day11/**:`MybatisPlusConfig` 注册 MySQL 分页拦截器;`UserPageMapper` 通过 `@Select` 自定义多表 SQL 返回 `UserVO`;`UserPageController` 接收 `page`/`size`/`name` 参数返回分页结果(IPage)。
 - **day12/**:`Log` 自定义注解标记需记录日志的方法;`LogAspect` 环绕切面拦截 `@Log` 方法,采集请求 URL/IP/参数/耗时/当前登录人后封装为 `SysLog`;`LogService` 作为生产者将日志序列化为 JSON 投递到 RabbitMQ,不再走单机线程池。
 - **day13/**:`RabbitConfig` 声明 Direct 交换机 `system.log.exchange`、持久化队列 `system.log.queue` 及其绑定;`LogMessageConsumer` 通过 `@RabbitListener` 监听队列,反序列化后异步消费日志,实现业务解耦与削峰填谷。
+- **day15/**:`NacosConfigController` 用 `@RefreshScope` + `@Value("${app.info}")` 读取 Nacos 配置中心的 `fullstack-backend.yaml`,配置变更后无需重启即时生效;`SecurityConfig` 对 `/api/day15/**` 放行。应用名统一为 `fullstack-backend`,与 Nacos Data ID、K8s 镜像名保持一致。
 
 ## 常见问题
 
@@ -248,3 +297,6 @@ npm run dev
 - **文件上传报错/超时**:确认 MinIO 已启动且 `fullstack-bucket` 已创建(Compose 的 `minio-init` 会自动创建),`application.properties` 中 `minio.endpoint` 与实际地址一致。
 - **上传后图片打不开**:检查 `minio.public-endpoint` 是否为浏览器可访问的地址(Compose 中为 `http://localhost:9000`),且 bucket 已开放匿名读。
 - **操作页面后控制台无日志输出**:确认 RabbitMQ 容器已启动(`http://localhost:15672` 可登录),后端启动日志中已声明 `system.log.exchange` / `system.log.queue`;投递失败时 `LogService` 会打印异常堆栈。
+- **后端启动报 Nacos 连接失败/超时**:确认 `nacos-standalone` 容器已运行,且 `8848`、`9848`(gRPC)端口都已映射;`bootstrap.properties` 已把 gRPC 超时调到 10 秒以适配 Docker 仿真环境。
+- **Maven 拉取 Spring Cloud 依赖失败**:`pom.xml` 已配置阿里云镜像仓库;仍有失败缓存时执行 `find ~/.m2/repository -name "*.lastUpdated" -exec rm -f {} \;` 后 `mvn clean compile -U`。
+- **Nacos 配置修改后接口不变**:确认 Data ID 为 `fullstack-backend.yaml`、Group 为 `DEFAULT_GROUP`、格式为 YAML,且读取该配置的 Bean 带有 `@RefreshScope`。
