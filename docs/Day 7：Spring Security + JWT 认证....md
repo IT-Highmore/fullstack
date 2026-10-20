@@ -215,6 +215,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态 Session
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login").permitAll() // 开放登录接口
+                // 2. 放行 Day 15 的 Nacos 测试接口
+                .requestMatchers("/api/day15/**").permitAll()
                 .anyRequest().authenticated() // 其他所有接口均需 Token 鉴权
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
